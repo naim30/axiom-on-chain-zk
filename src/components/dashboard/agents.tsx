@@ -50,6 +50,8 @@ export default function Agents({
       const walletClient = getWalletClient(id);
       const hash = await walletClient.writeContract(request);
 
+      await client.waitForTransactionReceipt({ hash });
+
       console.log({
         ['Transfer Transaction Hash']: hash,
       });

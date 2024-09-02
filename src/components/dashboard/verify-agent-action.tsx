@@ -39,7 +39,7 @@ export default function VerifyAgentAction({
     string | undefined
   >();
 
-  const [isVerifiable, setIsVerifiable] = useState(false);
+  const [loadingParams, setLoadingParams] = useState(false);
 
   useEffect(() => {
     if (!transactionHash && agentTransactionHash) {
@@ -50,61 +50,65 @@ export default function VerifyAgentAction({
   const { build, setParams, areParamsSet } =
     useAxiomCircuit<typeof AxiomSettings.inputs>();
 
-  const onSetParams = async () => {
+  useEffect(() => {
     if (!transactionHash || !taskInfo) return;
 
-    const nId = notifications.show({
-      title: `Running action`,
-      message: 'Please wait...',
-      loading: true,
-      autoClose: false,
-      withCloseButton: false,
-      withBorder: true,
-    });
-
-    try {
-      const blockNumber = taskInfo.blockNumber;
-      const from = agents[selectedAgent].address;
-      const to = taskInfo.receiver;
-      const amount = convertAmountToToken(taskInfo.amount);
-      const token = CONFIG.NEXT_PUBLIC_TOKEN_CONTRACT;
-
-      const transaction = await client.getTransaction({
-        hash: transactionHash as `0x${string}`,
+    (async () => {
+      setLoadingParams(true);
+      const nId = notifications.show({
+        title: `Running action`,
+        message: 'Please wait...',
+        loading: true,
+        autoClose: false,
+        withCloseButton: false,
+        withBorder: true,
       });
-      const transactionIndex = transaction.transactionIndex;
-      const transactionBlockNumber = Number(transaction.blockNumber);
 
-      setParams(
-        {
-          blockNumber,
-          from,
-          to,
-          token,
-          amount,
-          transactionBlockNumber,
-          transactionIndex,
-        },
-        CONFIG.NEXT_PUBLIC_TARGET_CONTRACT,
-        bytes32(from),
-        from
-      );
+      try {
+        const blockNumber = taskInfo.blockNumber;
+        const from = agents[selectedAgent].address;
+        const to = taskInfo.receiver;
+        const amount = convertAmountToToken(taskInfo.amount);
+        const token = CONFIG.NEXT_PUBLIC_TOKEN_CONTRACT;
 
-      setTimeout(() => {
-        setIsVerifiable(true);
-      }, 1000);
+        const transaction = await client.getTransaction({
+          hash: transactionHash as `0x${string}`,
+        });
+        const transactionIndex = transaction.transactionIndex;
+        const transactionBlockNumber = Number(transaction.blockNumber);
 
-      notifications.hide(nId);
-    } catch (error) {
-      notifications.hide(nId);
+        setParams(
+          {
+            blockNumber,
+            from,
+            to,
+            token,
+            amount,
+            transactionBlockNumber,
+            transactionIndex,
+          },
+          CONFIG.NEXT_PUBLIC_TARGET_CONTRACT,
+          bytes32(from),
+          from
+        );
 
-      notifications.show({
-        title: 'Error',
-        message: 'Something went wrong, please try again.',
-        color: 'red',
-      });
-    }
-  };
+        setTimeout(() => {
+          setLoadingParams(false);
+        }, 1000);
+
+        notifications.hide(nId);
+      } catch (error) {
+        setLoadingParams(false);
+        notifications.hide(nId);
+
+        notifications.show({
+          title: 'Error',
+          message: 'Something went wrong, please try again.',
+          color: 'red',
+        });
+      }
+    })();
+  }, [transactionHash, taskInfo, selectedAgent]);
 
   const onVerify = async () => {
     if (!areParamsSet) return;
@@ -166,15 +170,13 @@ export default function VerifyAgentAction({
         />
 
         <Group justify="right">
-          {!areParamsSet || !isVerifiable ? (
-            <Button className="ml-auto" onClick={() => onSetParams()}>
-              Set Params
-            </Button>
-          ) : (
-            <Button className="ml-auto" onClick={() => onVerify()}>
-              Verify
-            </Button>
-          )}
+          <Button
+            disabled={!areParamsSet || loadingParams}
+            className="ml-auto"
+            onClick={() => onVerify()}
+          >
+            Verify
+          </Button>
         </Group>
       </form>
 
